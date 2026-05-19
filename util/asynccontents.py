@@ -70,13 +70,18 @@ class AsyncContents(metaclass=Singleton):
         return await response.json()
 
     async def __get_ok(self, resource, method=METH_GET, params=None, headers=None):
-        response = await self.__get(
-            resource,
-            method=method,
-            params=params,
-            headers=headers,
-        )
-        return self.__check_ok(response)
+        for i in range(0, 3):
+            response = await self.__get(
+                resource,
+                method=method,
+                params=params,
+                headers=headers,
+            )
+            if self.__is_ok(response):
+                return response
+            elif i == 2:
+                return self.__check_ok(response)
+        raise Exception('')
 
     async def headers(self, resource):
         response = await self.__get_ok(
@@ -111,15 +116,20 @@ class AsyncContents(metaclass=Singleton):
         by sleeping
         https://github.com/aio-libs/aiohttp/issues/1799
     '''
+
     @staticmethod
     async def try_avoiding_connection_errors():
         await asyncio.sleep(0.001)
 
     @staticmethod
     def __check_ok(response):
-        if response.status != HTTPStatus.OK:
+        if not AsyncContents.__is_ok(response):
             raise ResponseError(response)
         return response
+
+    @staticmethod
+    def __is_ok(response):
+        return response.status == HTTPStatus.OK
 
     async def chunked(self, resource):
         response = await self.__get_ok(resource)

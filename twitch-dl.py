@@ -52,6 +52,8 @@ class CommandLineParser:
         parser.add_option('-e', '--end-time', metavar='END', action='callback',
                           callback=self.__to_seconds, type='string',
                           default=sys.maxsize)
+        parser.add_option('-l', '--list-formats', action='store_true', default=False)
+        parser.add_option('-f', '--source-format', metavar='FORMAT', type='string')
         parser.usage = '%prog [options] vod_id'
         self.get_usage = lambda: parser.get_usage()
         self.parse_args = lambda: parser.parse_args()
@@ -73,7 +75,7 @@ class CommandLineParser:
         if options.end_time <= options.start_time:
             Log.fatal("End time can't be earlier than start time\n")
         try:
-            return options.start_time, options.end_time, int(args[0])
+            return options.start_time, options.end_time, options.list_formats, options.source_format, int(args[0])
         except ValueError:
             Log.fatal(self.get_usage())
 
@@ -96,15 +98,23 @@ class FileMaker:
 
 
 async def main():
-    (start_time, end_time, vod_id) = CommandLineParser().parse_command_line()
-    m3u8_playlist = PlaylistFetcher().fetch_for_vod(vod_id)
-    if m3u8_playlist is None:
-        Log.fatal("Seems like vod {} doesn't exist".format(vod_id))
-    vod_segments = Chunks.get(m3u8_playlist.segments, start_time, end_time)
-    file_name = FileMaker.make_avoiding_overwrite(Vod.title(vod_id) + '.ts')
-    downloader = VodDownloader(vod_segments)
-    signal.signal(signal.SIGINT, lambda sig, frame: downloader.stop())
-    await downloader.download_to(file_name)
+    (start_time, end_time, list_formats, source_format, vod_id) = CommandLineParser().parse_command_line()
+    if list_formats:
+        for fmt in PlaylistFetcher().list_formats_for_vod(vod_id):
+            print(fmt)
+        sys.exit(0)
+    else:
+        try:
+            m3u8_playlist = PlaylistFetcher().fetch_for_vod(vod_id, source_format)
+            if m3u8_playlist is None:
+                Log.fatal("Seems like vod {} doesn't exist".format(vod_id))
+            vod_segments = Chunks.get(m3u8_playlist.segments, start_time, end_time)
+            file_name = FileMaker.make_avoiding_overwrite(f"{vod_id}.ts")
+            downloader = VodDownloader(vod_segments)
+            signal.signal(signal.SIGINT, lambda sig, frame: downloader.stop())
+            await downloader.download_to(file_name)
+        except Exception as e:
+            Log.fatal(str(e))
 
 
 if __name__ == '__main__':

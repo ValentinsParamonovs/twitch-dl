@@ -33,7 +33,7 @@ class VodDownloader:
             last_offset = new_offset
             download_jobs = []
             for segment, offset in segments_with_offsets:
-                download_jobs.append(self.fetch_segment_and_write(segment, offset, file_name, progress_bar))
+                download_jobs.append(asyncio.create_task(self.fetch_segment_and_write(segment, offset, file_name, progress_bar)))
             await self.wait_for(download_jobs)
 
     @staticmethod
@@ -60,6 +60,7 @@ class VodDownloader:
                     raise StoppedException('Stopped')
                 file.write(chunk)
         progress_bar.update_by(1)
+        await asyncio.sleep(1)
 
     @classmethod
     async def get_segment_offsets(cls, batch, initial_offset):

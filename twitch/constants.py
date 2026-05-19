@@ -1,10 +1,14 @@
 class Twitch:
+    vod_link = 'https://www.twitch.tv/videos/{}'
+    gql_link = 'https://gql.twitch.tv/gql'
+    gql_token_request_body = '''{"operationName":"PlaybackAccessToken_Template","query":"query PlaybackAccessToken_Template($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, $playerType: String!, $platform: String!) {  streamPlaybackAccessToken(channelName: $login, params: {platform: $platform, playerBackend: \\"mediaplayer\\", playerType: $playerType}) @include(if: $isLive) {    value    signature   authorization { isForbidden forbiddenReasonCode }   __typename  }  videoPlaybackAccessToken(id: $vodID, params: {platform: $platform, playerBackend: \\"mediaplayer\\", playerType: $playerType}) @include(if: $isVod) {    value    signature   __typename  }}","variables":{"isLive":false,"login":"","isVod":true,"vodID":"#vodId","playerType":"site","platform":"web"}}'''
+    acmb_json='''{"AppVersion":"2265f4c3-67fb-45cd-ad61-9773af6d3937","ClientApp":"twilight","URL":"https://www.twitch.tv/videos/#vodId"}'''
     channel_playlist_link = 'https://usher.ttvnw.net/api/channel/hls/{}.m3u8'
-    vod_playlist_link = 'http://usher.justin.tv/vod/{}'
+    vod_playlist_link = 'https://usher.ttvnw.net/vod/v2/{vodId}.m3u8?acmb={acmb}&allow_source=true&browser_family=firefox&browser_version=151.0&cdm=wv&enable_score=true&include_unavailable=true&lang=en&os_name=Linux&os_version=undefined&p=283436&platform=web&player_backend=mediaplayer&player_version=1.52.0-rc.3&playlist_include_framerate=true&reassignments_supported=true&sig={tokenSignature}&supported_codecs=av1,h265,h264&token={token}&transcode_mode=cbr_v1'
     channel_token_link = 'https://api.twitch.tv/api/channels/{}/access_token'
     vod_token_link = 'https://api.twitch.tv/api/vods/{}/access_token'
     stream_link = 'https://api.twitch.tv/helix/streams'
-    client_id_header = {'Client-ID': 'jzkbprff40iqj646a697cyrvl0zt2m6'}
+    client_id = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
     auth_token_url = 'https://id.twitch.tv/oauth2/token?grant_type=client_credentials&client_id={client_id}&client_secret={client_secret}'
     users_url = 'https://api.twitch.tv/helix/users'
     videos_url = 'https://api.twitch.tv/helix/videos'

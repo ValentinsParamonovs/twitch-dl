@@ -1,3 +1,6 @@
+import base64
+from urllib.parse import quote_plus as urlencode
+
 import m3u8
 from m3u8 import M3U8
 
@@ -35,28 +38,57 @@ class Playlist:
         playlist_link = Twitch.channel_playlist_link.format(channel_name)
         return self.__fetch_playlist(playlist_link, token)
 
-    def __fetch_playlist(self, playlist_link, token):
-        playlist_container = self.fetch_playlist(playlist_link, token)
+    def __fetch_playlist(self, playlist_link, source_format):
+        playlist_container = self.fetch_playlist(playlist_link)
         if len(playlist_container.playlists) == 0:
             return playlist_container
-        self.__best_quality_link_resource.store(playlist_container.playlists[0].uri)
+        playlist_uri = next(
+            (
+                p.uri
+                for p in playlist_container.playlists
+                if p.stream_info.stable_variant_id.startswith(source_format)
+            ),
+            None
+        ) if source_format else playlist_container.playlists[0].uri
+        if playlist_uri:
+            self.__best_quality_link_resource.store(playlist_uri)
+        else:
+            raise Exception("Can't find playlist by format \"{}\"".format(source_format))
         return self.fetch_playlist(self.__best_quality_link_resource.value())
 
     @staticmethod
     def fetch_playlist(link, token=None):
-        params = {'allow_source': 'true'} if token else {}
-        params.update(
-            {'token': token['token'], 'sig': token['sig']} if token else {}
-        )
-        raw_playlist = Contents.utf8(link, params=params, onerror=lambda _: None)
+        raw_playlist = Contents.utf8(link, onerror=lambda _: None)
         if raw_playlist is None:
             return M3U8(None)
         return m3u8.loads(raw_playlist)
 
-    def fetch_for_vod(self, vod_id):
+    def fetch_for_vod(self, vod_id, source_format):
         token = Token.fetch_for_vod(vod_id)
-        playlist_link = Twitch.vod_playlist_link.format(vod_id)
+        playlist_link = self.build_playlist_link(token, vod_id)
         self.__best_quality_link_resource = PersistentJsonResource('/dev/null')
-        playlist = self.__fetch_playlist(playlist_link, token)
+        playlist = self.__fetch_playlist(playlist_link, source_format)
         playlist.base_path = self.__best_quality_link_resource.value().rsplit('/', 1)[0]
         return playlist
+
+    def list_formats_for_vod(self, vod_id):
+        token = Token.fetch_for_vod(vod_id)
+        playlist_link = self.build_playlist_link(token, vod_id)
+        return self.__fetch_format_list(playlist_link)
+
+    @staticmethod
+    def build_playlist_link(token, vod_id) -> str:
+        return Twitch.vod_playlist_link.format(
+            vodId=vod_id,
+            acmb=urlencode(
+                base64.b64encode(Twitch.acmb_json.replace('#vodId', str(vod_id)).encode('utf-8')).decode('ascii')
+            ),
+            token=urlencode(token['value']),
+            tokenSignature=urlencode(token['signature']),
+        )
+
+    def __fetch_format_list(self, playlist_link):
+        playlist_container = self.fetch_playlist(playlist_link)
+        if len(playlist_container.playlists) == 0:
+            raise Exception('No formats found!')
+        return [p.stream_info.stable_variant_id for p in playlist_container.playlists]

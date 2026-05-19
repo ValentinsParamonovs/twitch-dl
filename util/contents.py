@@ -1,14 +1,14 @@
 from collections import namedtuple
 
 import requests
-from requests import codes as status
+from requests import codes as status, Response
 
 from util.log import Log
 
 Content = namedtuple('Content', 'decode')
 
 
-class Error:
+class Error(Exception):
     def __init__(self, value):
         self.headers = value
         self.content = Content(decode=lambda _: value)
@@ -52,11 +52,12 @@ class Contents:
         )
 
     @classmethod
-    def headers(cls, resource):
+    def cookies(cls, resource) -> dict[str, str | None]:
         try:
-            return cls.__check_ok(requests.head(resource)).headers
+            return dict(cls.__check_ok(requests.get(resource)).cookies.items())
         except Exception as e:
             Log.fatal(str(e))
+            return dict()
 
     @staticmethod
     def __get(resource, params=None, headers=None):
@@ -71,7 +72,7 @@ class Contents:
             Log.fatal(str(e))
 
     @staticmethod
-    def __check_ok(response, onerror=None):
+    def __check_ok(response: Response, onerror=None) -> Response:
         if response.status_code != status.ok:
             if onerror is None:
                 Log.fatal(
@@ -81,7 +82,7 @@ class Contents:
                     )
                 )
             else:
-                return Error(onerror(response.status_code))
+                raise Error(onerror(response.status_code))
         return response
 
     @classmethod
@@ -89,19 +90,20 @@ class Contents:
         return cls.__get_ok(resource, onerror=onerror).iter_content(chunk_size=2097152)
 
     @classmethod
-    def post(cls, resource, params=None, headers=None, onerror=None):
+    def post(cls, resource, params=None, headers=None, onerror=None, data=None):
         return cls.__check_ok(
-            cls.__post(resource, params=params, headers=headers),
+            cls.__post(resource, params=params, headers=headers, data=data),
             onerror=onerror
         )
 
     @classmethod
-    def __post(cls, resource, params, headers):
+    def __post(cls, resource, params, headers, data):
         try:
             return requests.post(
                 resource,
                 params=params,
                 headers=headers,
+                data=data,
                 stream=True
             )
         except Exception as e:

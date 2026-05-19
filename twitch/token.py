@@ -28,12 +28,16 @@ class Token:
         return token_expiration_ms - cls.__expiration_buffer_seconds < time()
 
     @staticmethod
-    def __fetch(link):
-        return Contents.json(
+    def __fetch(link, device_id, vod_id):
+        return Contents.post(
             link,
-            headers=Twitch.client_id_header,
+            headers={
+                'Client-ID': Twitch.client_id,
+                'Device-ID': device_id,
+            },
+            data=Twitch.gql_token_request_body.replace('#vodId', str(vod_id)),
             onerror=lambda _: None
-        )
+        ).json()
 
     def __fetch_and_store_token(self, channel_name):
         token = self.__fetch(Twitch.channel_token_link.format(channel_name))
@@ -42,4 +46,6 @@ class Token:
 
     @classmethod
     def fetch_for_vod(cls, vod_id):
-        return cls.__fetch(Twitch.vod_token_link.format(vod_id))
+        device_id = Contents.cookies(Twitch.vod_link.format(vod_id))['unique_id']
+        token_response = cls.__fetch(Twitch.gql_link, device_id, vod_id)
+        return token_response['data']['videoPlaybackAccessToken']
