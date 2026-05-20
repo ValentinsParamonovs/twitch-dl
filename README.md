@@ -3,7 +3,6 @@ Download Twitch VODs
 
 ## Running
 ```sh
-uv init
 # best format
 uv run twitch-dl.py vod_id
 # list formats
